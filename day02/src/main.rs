@@ -2,19 +2,15 @@ use shared::*;
 
 /// Setup
 fn main() {
-    let mut buffer = get_input(env!("CARGO_MANIFEST_DIR"));
+    let input = get_input(env!("CARGO_MANIFEST_DIR"));
 
-    part_selector(&mut buffer, part_one, part_two);
+    part_selector(input, part_one, part_two);
 }
 
 /// Parse the `input.txt` and convert to a `Vec<u32>`,
 /// then process it using the simple Intcode machine.
-fn part_one(buffer: &mut Buffer) {
-    let mut program_string = String::new();
-    buffer.read_line(&mut program_string)
-        .expect("bad program input");
-
-    let mut program = parse_program(program_string.trim());
+fn part_one(input: String) {
+    let mut program = parse_program(input.trim());
     program[1] = 12;
     program[2] = 2;
     run_program(&mut program);
@@ -26,12 +22,8 @@ fn part_one(buffer: &mut Buffer) {
 /// to get the desired value at memory address 0.
 /// The method is inefficient, but reasonably quick over a small
 /// solution space such as in this problem.
-fn part_two(buffer: &mut Buffer) {
-    let mut program_string = String::new();
-    buffer.read_line(&mut program_string)
-        .expect("bad program input");
-    
-    let mut program = parse_program(program_string.trim());
+fn part_two(input: String) {
+    let mut program = parse_program(input.trim());
     'outer: for a in 0..100 {
         for b in 0..100 {
             program[1] = a;
@@ -42,7 +34,7 @@ fn part_two(buffer: &mut Buffer) {
                 break 'outer;
             }
 
-            program = parse_program(program_string.trim());
+            program = parse_program(input.trim());
         }
     }
 

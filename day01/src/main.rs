@@ -5,15 +5,15 @@
 use shared::*;
 
 fn main() {
-    let mut buffer = get_input(env!("CARGO_MANIFEST_DIR"));
+    let input = get_input(env!("CARGO_MANIFEST_DIR"));
 
-    part_selector(&mut buffer, part_one, part_two);
+    part_selector(input, part_one, part_two);
 }
 
-fn part_one(buffer: &mut Buffer) {
+fn part_one(input: String) {
     let mut sum = 0;
-    for line in buffer.lines() {
-        let mass = line.unwrap().parse::<i32>().unwrap();
+    for line in input.lines() {
+        let mass = line.parse::<i32>().unwrap();
 
         sum += get_fuel(mass);
     }
@@ -21,10 +21,10 @@ fn part_one(buffer: &mut Buffer) {
     println!("[Part 1] Sum of fuel requirements: {}", sum);
 }
 
-fn part_two(buffer: &mut Buffer) {
+fn part_two(input: String) {
     let mut sum = 0;
-    for line in buffer.lines() {
-        let mass = line.unwrap().parse::<i32>().unwrap();
+    for line in input.lines() {
+        let mass = line.parse::<i32>().unwrap();
 
         sum += get_fuel_recursive(mass);
     }

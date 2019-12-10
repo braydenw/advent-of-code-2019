@@ -1,33 +1,31 @@
-pub use std::io::{BufReader, BufRead, Seek};
+pub use std::io::Read;
 pub use std::fs::File;
 
 use std::path::Path;
 
-pub type Buffer = BufReader<File>;
-
 /// Setup a BufReader on the provided `input.txt`.
-pub fn get_input(p: &'static str) -> Buffer {
-    let file = File::open(Path::new(p).join("input.txt"))
+pub fn get_input(p: &'static str) -> String {
+    let mut input = String::new();
+    let mut file = File::open(Path::new(p).join("input.txt"))
         .expect("bad path");
     
-    BufReader::new(file)
+    file.read_to_string(&mut input)
+        .expect("failed to read input to String");
+    
+    input
 }
 
 /// Runs a specified part.
-pub fn part_selector(reader: &mut Buffer, a: fn(&mut Buffer), b: fn(&mut Buffer)) {
-    use std::io::SeekFrom;
-
+pub fn part_selector(input: String, a: fn(String), b: fn(String)) {
     let args: Vec<String> = std::env::args().collect();
 
     if args.len() == 2 && args[1].as_str() == "1" {
-        a(reader);
+        a(input);
     } else if args.len() == 2 && args[1].as_str() == "2" {
-        b(reader);
+        b(input);
     } else {
-        a(reader);
-        reader.seek(SeekFrom::Start(0))
-            .expect("failed to reset BufReader");
-        b(reader);
+        a(input.clone());
+        b(input);
     }
 }
 

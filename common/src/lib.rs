@@ -2,6 +2,7 @@ pub use std::io::Read;
 pub use std::fs::File;
 
 use std::path::Path;
+use std::time::Instant;
 
 /// Setup a BufReader on the provided `input.txt`.
 pub fn get_input(p: &'static str) -> String {
@@ -15,10 +16,11 @@ pub fn get_input(p: &'static str) -> String {
     input
 }
 
-/// Runs a specified part.
+/// Runs a specified part, or both.
 pub fn part_selector(input: String, a: fn(String), b: fn(String)) {
     let args: Vec<String> = std::env::args().collect();
 
+    let start = Instant::now();
     if args.len() == 2 && args[1].as_str() == "1" {
         a(input);
     } else if args.len() == 2 && args[1].as_str() == "2" {
@@ -27,6 +29,9 @@ pub fn part_selector(input: String, a: fn(String), b: fn(String)) {
         a(input.clone());
         b(input);
     }
+    
+    let time = Instant::now().duration_since(start);
+    println!("Time: {}ms ({}us)", time.as_millis(), time.as_micros());
 }
 
 /// Simple Intcode machine.

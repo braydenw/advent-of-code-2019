@@ -1,4 +1,4 @@
-use shared::*;
+use common::*;
 
 /// Setup
 fn main() {

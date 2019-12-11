@@ -2,7 +2,7 @@
 //! As days progress, I'll work on reducing code duplication.
 //! I kind of like the `part_selector` function right now though.
 
-use shared::*;
+use common::*;
 
 fn main() {
     let input = get_input(env!("CARGO_MANIFEST_DIR"));

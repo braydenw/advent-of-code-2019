@@ -6,20 +6,21 @@ fn main() {
 }
 
 fn part_one(_: String) {
-    let valid = count_valid(246515, 739105);
+    let valid = count_valid(246515, 739105, None);
 
     println!("[Part 1] Number of possible passwords within the given range: {}", valid);
 }
 
 fn part_two(_: String) {
-    let valid = count_valid(246515, 739105);
-
-    unimplemented!();
+    let valid = count_valid(246515, 739105, Some(2));
 
     println!("[Part 2] Number of possible passwords within the given range: {}", valid);
 }
 
-fn count_valid(a: u32, b: u32) -> usize {
+/// Count the number of valid passwords contained in the `a..=b` range.
+/// The `limit` ensures a group of repeated digits of `Some(..)` length
+/// exists that isn't also part of a larger group.
+fn count_valid(a: u32, b: u32, limit: Option<u8>) -> usize {
     let mut valid = Vec::with_capacity(1000);
 
     let end = b;
@@ -45,15 +46,25 @@ fn count_valid(a: u32, b: u32) -> usize {
         last_digit = 10;
 
         // Ensure at least two repeating digits.
+        let mut groups = [0u8; 10];
         for _ in 1..=6 {
             let digit = number % 10;
             if last_digit == digit {
-                valid.push(num);
-                break;
+                if let Some(l) = limit {
+                    groups[digit as usize] += l - 1;
+                } else {
+                    valid.push(num);
+                    break;
+                }
             }
 
             last_digit = digit;
             number = number / 10;
+        }
+
+        // Wasted cycles when `limit == None`.
+        if groups.contains(&1) {
+            valid.push(num);
         }
         
         num += 1;
@@ -63,6 +74,15 @@ fn count_valid(a: u32, b: u32) -> usize {
 }
 
 #[test]
+fn part_one_examples() {
+    assert_eq!(1, count_valid(111111, 111111, None));
+    assert_eq!(0, count_valid(223450, 223450, None));
+    assert_eq!(0, count_valid(123789, 123789, None));
+}
+
+#[test]
 fn part_two_examples() {
-    // TODO
+    assert_eq!(1, count_valid(112233, 112233, Some(2)));
+    assert_eq!(0, count_valid(123444, 123444, Some(2)));
+    assert_eq!(1, count_valid(111122, 111122, Some(2)));
 }

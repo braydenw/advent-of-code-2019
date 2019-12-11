@@ -1,3 +1,7 @@
+//! More optimization could probably be done during iteration,
+//! like skipping numbers that are certainly not valid,
+//! but this runs reasonably quick as is (~0.75ms).
+
 use common::*;
 
 /// Setup

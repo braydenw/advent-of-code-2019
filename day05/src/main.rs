@@ -14,12 +14,16 @@ fn main() {
 fn part_one(input: String) {
     let mut vm = IntcodeVM::new(input).log_level(1);
     vm.run();
+
+    println!("[Part 1] Final output: {}", vm.outputs().last().unwrap());
 }
 
 /// Seems to average ~0.21ms.
 fn part_two(input: String) {
     let mut vm = IntcodeVM::new(input).log_level(1);
     vm.run();
+
+    println!("[Part 2] Final output: {}", vm.outputs().last().unwrap());
 }
 
 /// To be run from workspace root with 

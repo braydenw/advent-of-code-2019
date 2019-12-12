@@ -23,7 +23,7 @@ fn part_two(input: String) {
 }
 
 /// To be run from workspace root with 
-/// `cat day05/test_inputs.txt | cargo test -p day05`.
+/// `cat test_inputs.txt | cargo test -p day05`.
 /// Also, this is a bad way to do tests. They should really be split
 /// into many smaller tests if this were for anything serious.
 #[test]

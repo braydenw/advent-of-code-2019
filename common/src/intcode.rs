@@ -12,6 +12,7 @@ pub struct IntcodeVM {
     memory: [i32; MEMORY_SIZE],
     pointer: usize,
     log_level: u8,
+    outputs: Vec<i32>,
 }
 
 impl IntcodeVM {
@@ -22,6 +23,7 @@ impl IntcodeVM {
             memory: [0; MEMORY_SIZE],
             pointer: 0,
             log_level: 0,
+            outputs: Vec::with_capacity(32),
         };
         me.set_input(input);
 
@@ -46,39 +48,38 @@ impl IntcodeVM {
         for i in 0..ints.len() {
             self.memory[i] = ints[i];
         }
-
-        self.pointer = 0;
     }
 
     pub fn run(&mut self) {
         self.pointer = 0;
+        self.outputs.clear();
 
         'processor: loop {
             let (opcode, modes) = self.read_instr();
 
             match opcode {
-                01 => { // ADD R R W
-                    self.info("ADD");
-
-                    let p1 = self.read_param(modes[0]);
-                    let p2 = self.read_param(modes[1]);
-                    
-                    self.write_param(p1 + p2);
-                },
-                02 => { // MUL R R W
-                    self.info("MUL");
-
+                01 | 02 => { // ADD R R W | MUL R R W
                     let p1 = self.read_param(modes[0]);
                     let p2 = self.read_param(modes[1]);
 
-                    self.write_param(p1 * p2);
+                    let val = if opcode == 1 {
+                        self.info("ADD");
+                        p1 + p2
+                    } else {
+                        self.info("MUL");
+                        p1 * p2
+                    };
+
+                    self.write_param(val);
                 },
                 03 => { // NPT W
                     self.info("NPT");
 
+                    // Read input from stdin.
                     let int = match super::read_stdin().parse::<i32>() {
                         Ok(i) => i,
-                        Err(_) => {
+                        Err(e) => {
+                            println!("{}", e);
                             self.error("input not a valid integer");
                             break 'processor;
                         }
@@ -89,7 +90,44 @@ impl IntcodeVM {
                 04 => { // OPT R
                     self.info("OPT");
 
-                    println!("{}", self.read_param(modes[0]));
+                    let val = self.read_param(modes[0]);
+                    self.outputs.push(val);
+
+                    println!("{}", val);
+                },
+                05 | 06 => { // JT R R | JF R R
+                    let p1 = self.read_param(modes[0]);
+                    let p2 = self.read_param(modes[1]);
+
+                    let cond = if opcode == 5 {
+                        self.info("JT");
+                        p1 != 0
+                    } else {
+                        self.info("JF");
+                        p1 == 0
+                    };
+
+                    if cond {
+                        self.pointer = p2 as usize;
+                    }
+                },
+                07 | 08 => { // LT R R W | EQ R R W
+                    let p1 = self.read_param(modes[0]);
+                    let p2 = self.read_param(modes[1]);
+
+                    let cond = if opcode == 7 {
+                        self.info("LT");
+                        p1 < p2
+                    } else {
+                        self.info("EQ");
+                        p1 == p2
+                    };
+
+                    if cond {
+                        self.write_param(1);
+                    } else {
+                        self.write_param(0);
+                    }
                 },
                 99 => {
                     self.info("HLT");
@@ -101,6 +139,12 @@ impl IntcodeVM {
                 }
             };
         }
+    }
+
+    /// The outputs of a program.
+    /// Useful for comparing expected outputs programmatically.
+    pub fn outputs(&self) -> &Vec<i32> {
+        &self.outputs
     }
 
     /// Reads an instruction from memory at the instruction pointer
@@ -143,13 +187,15 @@ impl IntcodeVM {
 
     fn info(&self, msg: &'static str) {
         if self.log_level >= 2 {
-            println!("[ INFO_{:04}::{:<8}] {}", self.pointer - 1, self.memory[self.pointer - 1], msg);
+            println!("[ INFO_{:04}::{:<8}] {}",
+                self.pointer - 1, self.memory[self.pointer - 1], msg);
         }
     }
 
     fn error(&self, msg: &'static str) {
         if self.log_level >= 1 {
-            eprintln!("[ERROR_{:04}::{:<8}] {}", self.pointer - 1, self.memory[self.pointer - 1], msg);
+            eprintln!("[ERROR_{:04}::{:<8}] {}",
+                self.pointer - 1, self.memory[self.pointer - 1], msg);
         }
     }
 }

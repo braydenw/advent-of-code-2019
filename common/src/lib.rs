@@ -1,3 +1,6 @@
+mod intcode;
+pub use intcode::IntcodeVM;
+
 pub use std::io::Read;
 pub use std::fs::File;
 
@@ -29,37 +32,18 @@ pub fn part_selector(input: String, a: fn(String), b: fn(String)) {
         a(input.clone());
         b(input);
     }
-    
+
     let time = Instant::now().duration_since(start);
     println!("Time: {}ms ({}us)", time.as_millis(), time.as_micros());
 }
 
-/// Simple Intcode machine.
-/// Takes some memory and processes it.
-fn run_intcode(memory: &mut Vec<u32>) {
-    let mut pointer = 0;
-    
-    'processor: loop {
-        if pointer + 3 >= memory.len() {
-            break 'processor;
-        }
+/// Read a line from stdin.
+pub fn read_stdin() -> String {
+    let mut line = String::new();
 
-        let instr = memory[pointer];
-        let param_1 = memory[pointer + 1] as usize;
-        let param_2 = memory[pointer + 2] as usize;
-        let param_3 = memory[pointer + 3] as usize;
+    std::io::stdin()
+        .read_line(&mut line)
+        .expect("failed to read from stdin");
 
-        match instr {
-            1 => {
-                memory[param_3] = memory[param_1] + memory[param_2];
-            },
-            2 => {
-                memory[param_3] = memory[param_1] * memory[param_2];
-            },
-            99 => break 'processor,
-            _ => break 'processor
-        }
-
-        pointer += 4;
-    }
+    line.trim().to_string()
 }

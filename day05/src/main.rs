@@ -1,5 +1,5 @@
-//! Most of this code from this day in the Intcode virtual mashine
-//! within the `common` library.
+//! Most of the code from this day is within
+//! the `common` library's Intcode virtual machine.
 
 use common::*;
 

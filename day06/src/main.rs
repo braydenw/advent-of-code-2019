@@ -42,14 +42,6 @@ fn parse_id<S: Into<String>>(s: S) -> usize {
     id
 }
 
-/// Turns an object id back into a `String`.
-/// Only used in the tests.
-fn id_as_str(id: usize) -> String {
-    let bytes: Vec<u8> = id.to_le_bytes().iter()
-        .filter(|b| **b != 0).map(|b| *b).collect();
-    String::from_utf8_lossy(&bytes[..]).to_string()
-}
-
 /// Parses all the orbits into an easier to traverse format.
 fn parse_orbits(input: String) -> Objects {
     let mut universe = HashMap::with_capacity(2048);
@@ -141,6 +133,14 @@ fn min_transfers(orbits: &Objects) -> usize {
     }
 
     transfers - 2
+}
+
+/// Turns an object id back into a `String`.
+#[cfg(test)]
+fn id_as_str(id: usize) -> String {
+    let bytes: Vec<u8> = id.to_le_bytes().iter()
+        .filter(|b| **b != 0).map(|b| *b).collect();
+    String::from_utf8_lossy(&bytes[..]).to_string()
 }
 
 #[test]

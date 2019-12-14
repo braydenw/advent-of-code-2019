@@ -46,47 +46,41 @@ impl IntcodeVM {
         self
     }
 
-    /// Set the machine's input, overwriting existing memory.
-    /// Perhaps worth noting is that the machine memory is merely overwritten,
-    /// not cleared then rewritten.
+    /// Resets the Intcode virtual machine.
+    pub fn reset(&mut self) {
+        self.pointer = 0;
+        self.inputs.clear();
+        self.outputs.clear();
+        self.memory = [0; MEMORY_SIZE];
+    }
+
+    /// Set the machine memory to the given program.
+    /// Note that the virtual machine state gets reset when doing so.
     pub fn set_program<S: Into<String>>(&mut self, program: S) {
         let program = parse_program(program);
         
+        self.reset();
         for i in 0..program.len() {
             self.memory[i] = program[i];
         }
     }
 
-    /// Step through the program until `State::Error` or `State::Halted`.
+    /// Step through the program until `State::Halted`.
     pub fn run(&mut self) {
-        self.pointer = 0;
-        self.outputs.clear();
-
         while let State::Running = self.step() {
             // ???
         }
-
-        // loop {
-        //     match self.step() {
-        //         State::Running => {
-        //             self.step();
-        //         },
-        //         State::Halted => {
-        //             break;
-        //         },
-        //         State::Error(msg) => {
-        //             self.error(msg);
-        //             break;
-        //         }
-        //     }
-        // }
     }
 
+    /// Process a single instruction.
     pub fn step(&mut self) -> State {
         let (opcode, modes) = self.read_instr();
 
         match opcode {
-            01 | 02 => { // ADD R R W | MUL R R W
+            
+            // Opcode: add OR mul
+            // Params: read read write
+            01 | 02 => {
                 let p1 = self.read_param(modes[0]);
                 let p2 = self.read_param(modes[1]);
 
@@ -100,7 +94,10 @@ impl IntcodeVM {
 
                 self.write_param(val);
             },
-            03 => { // NPT W
+            
+            // Opcode: input
+            // Params: write
+            03 => {
                 self.info("NPT");
 
                 if let Some(int) = self.inputs.pop_front() {
@@ -114,13 +111,19 @@ impl IntcodeVM {
                     }
                 }
             },
-            04 => { // OPT R
+
+            // Opcode: output
+            // Params: read
+            04 => {
                 self.info("OPT");
 
                 let val = self.read_param(modes[0]);
                 self.outputs.push(val);
             },
-            05 | 06 => { // JT R R | JF R R
+            
+            // Opcode: jump-if-true OR jump-if-false
+            // Params: read read
+            05 | 06 => {
                 let p1 = self.read_param(modes[0]);
                 let p2 = self.read_param(modes[1]);
 
@@ -136,7 +139,10 @@ impl IntcodeVM {
                     self.pointer = p2 as usize;
                 }
             },
-            07 | 08 => { // LT R R W | EQ R R W
+            
+            // Opcode: less than OR equals
+            // Params: read read write
+            07 | 08 => {
                 let p1 = self.read_param(modes[0]);
                 let p2 = self.read_param(modes[1]);
 
@@ -154,12 +160,18 @@ impl IntcodeVM {
                     self.write_param(0);
                 }
             },
+            
+            // Opcode: halt
+            // Params: none
             99 => {
                 self.info("HLT");
                 return State::Halted;
             },
+            
+            // Opcode: unknown
+            // Params: perhaps many
             __ => {
-                self.error("invalid opcode");
+                self.error("unknown opcode");
                 return State::Halted;
             }
         }
@@ -167,16 +179,17 @@ impl IntcodeVM {
         return State::Running;
     }
 
+    /// Get the virtual machine's inputs.
     pub fn inputs(&self) -> Vec<&i32> {
         self.inputs.iter().collect()
     }
 
+    /// Push an input to the virtual machine's input queue.
     pub fn push_input(&mut self, int: i32) {
         self.inputs.push_back(int);
     }
 
-    /// The outputs of a program.
-    /// Useful for comparing expected outputs programmatically.
+    /// The outputs from running a program.
     pub fn outputs(&self) -> &Vec<i32> {
         &self.outputs
     }
@@ -219,6 +232,8 @@ impl IntcodeVM {
         self.memory[param as usize] = value;
     }
 
+    /// Prints an informative message, including the current instruction
+    /// pointer and the value to which it points in memory.
     fn info(&self, msg: &'static str) {
         if self.log_level >= 2 {
             println!("[ INFO_{:04}::{:<8}] {}",
@@ -226,6 +241,8 @@ impl IntcodeVM {
         }
     }
 
+    /// Prints an error message, including the current instruction
+    /// pointer and the value to which it points in memory.
     fn error(&self, msg: &'static str) {
         if self.log_level >= 1 {
             eprintln!("[ERROR_{:04}::{:<8}] {}",
@@ -234,6 +251,7 @@ impl IntcodeVM {
     }
 }
 
+/// Parse a program from a `String`, returning it as a `Vec<i32>`.
 pub fn parse_program<S: Into<String>>(program: S) -> Vec<i32> {
     program.into().trim().split(',')
         .map(|s| s.parse::<i32>().unwrap()).collect()

@@ -1,8 +1,15 @@
 //! Reasonably quick Intcode virtual machine.
 
+use std::collections::VecDeque;
+
 /// This is just an arbitrary size that seems to be able to hold any
 /// program Advent of Code gives.
 const MEMORY_SIZE: usize = 2048;
+
+pub enum State {
+    Halted,
+    Running,
+}
 
 /// The Intcode virtual machine itself.  
 /// `memory` represents the machine's memory.
@@ -12,6 +19,7 @@ pub struct IntcodeVM {
     memory: [i32; MEMORY_SIZE],
     pointer: usize,
     log_level: u8,
+    inputs: VecDeque<i32>,
     outputs: Vec<i32>,
 }
 
@@ -23,9 +31,10 @@ impl IntcodeVM {
             memory: [0; MEMORY_SIZE],
             pointer: 0,
             log_level: 0,
+            inputs: VecDeque::with_capacity(32),
             outputs: Vec::with_capacity(32),
         };
-        me.set_input(input);
+        me.set_program(input);
 
         me
     }
@@ -40,105 +49,130 @@ impl IntcodeVM {
     /// Set the machine's input, overwriting existing memory.
     /// Perhaps worth noting is that the machine memory is merely overwritten,
     /// not cleared then rewritten.
-    /// 
-    pub fn set_input<S: Into<String>>(&mut self, input: S) {
-        let ints: Vec<i32> = input.into().trim().split(',')
-            .map(|s| s.parse::<i32>().unwrap()).collect();
+    pub fn set_program<S: Into<String>>(&mut self, program: S) {
+        let program = parse_program(program);
         
-        for i in 0..ints.len() {
-            self.memory[i] = ints[i];
+        for i in 0..program.len() {
+            self.memory[i] = program[i];
         }
     }
 
+    /// Step through the program until `State::Error` or `State::Halted`.
     pub fn run(&mut self) {
         self.pointer = 0;
         self.outputs.clear();
 
-        'processor: loop {
-            let (opcode, modes) = self.read_instr();
-
-            match opcode {
-                01 | 02 => { // ADD R R W | MUL R R W
-                    let p1 = self.read_param(modes[0]);
-                    let p2 = self.read_param(modes[1]);
-
-                    let val = if opcode == 1 {
-                        self.info("ADD");
-                        p1 + p2
-                    } else {
-                        self.info("MUL");
-                        p1 * p2
-                    };
-
-                    self.write_param(val);
-                },
-                03 => { // NPT W
-                    self.info("NPT");
-
-                    // Read input from stdin.
-                    let int = match super::read_stdin().parse::<i32>() {
-                        Ok(i) => i,
-                        Err(e) => {
-                            println!("{}", e);
-                            self.error("input not a valid integer");
-                            break 'processor;
-                        }
-                    };
-
-                    self.write_param(int);
-                },
-                04 => { // OPT R
-                    self.info("OPT");
-
-                    let val = self.read_param(modes[0]);
-                    self.outputs.push(val);
-
-                    println!("{}", val);
-                },
-                05 | 06 => { // JT R R | JF R R
-                    let p1 = self.read_param(modes[0]);
-                    let p2 = self.read_param(modes[1]);
-
-                    let cond = if opcode == 5 {
-                        self.info("JT");
-                        p1 != 0
-                    } else {
-                        self.info("JF");
-                        p1 == 0
-                    };
-
-                    if cond {
-                        self.pointer = p2 as usize;
-                    }
-                },
-                07 | 08 => { // LT R R W | EQ R R W
-                    let p1 = self.read_param(modes[0]);
-                    let p2 = self.read_param(modes[1]);
-
-                    let cond = if opcode == 7 {
-                        self.info("LT");
-                        p1 < p2
-                    } else {
-                        self.info("EQ");
-                        p1 == p2
-                    };
-
-                    if cond {
-                        self.write_param(1);
-                    } else {
-                        self.write_param(0);
-                    }
-                },
-                99 => {
-                    self.info("HLT");
-                    break 'processor;
-                },
-                __ => {
-                    self.error("invalid opcode");
-                    break 'processor;
-                }
-            };
+        while let State::Running = self.step() {
+            // ???
         }
+
+        // loop {
+        //     match self.step() {
+        //         State::Running => {
+        //             self.step();
+        //         },
+        //         State::Halted => {
+        //             break;
+        //         },
+        //         State::Error(msg) => {
+        //             self.error(msg);
+        //             break;
+        //         }
+        //     }
+        // }
+    }
+
+    pub fn step(&mut self) -> State {
+        let (opcode, modes) = self.read_instr();
+
+        match opcode {
+            01 | 02 => { // ADD R R W | MUL R R W
+                let p1 = self.read_param(modes[0]);
+                let p2 = self.read_param(modes[1]);
+
+                let val = if opcode == 1 {
+                    self.info("ADD");
+                    p1 + p2
+                } else {
+                    self.info("MUL");
+                    p1 * p2
+                };
+
+                self.write_param(val);
+            },
+            03 => { // NPT W
+                self.info("NPT");
+
+                if let Some(int) = self.inputs.pop_front() {
+                    self.write_param(int);
+                } else {
+                    if let Ok(i) = super::read_stdin().parse::<i32>() {
+                        self.write_param(i);
+                    } else {
+                        self.error("input was not a valid integer");
+                        return State::Halted;
+                    }
+                }
+            },
+            04 => { // OPT R
+                self.info("OPT");
+
+                let val = self.read_param(modes[0]);
+                self.outputs.push(val);
+            },
+            05 | 06 => { // JT R R | JF R R
+                let p1 = self.read_param(modes[0]);
+                let p2 = self.read_param(modes[1]);
+
+                let cond = if opcode == 5 {
+                    self.info("JT");
+                    p1 != 0
+                } else {
+                    self.info("JF");
+                    p1 == 0
+                };
+
+                if cond {
+                    self.pointer = p2 as usize;
+                }
+            },
+            07 | 08 => { // LT R R W | EQ R R W
+                let p1 = self.read_param(modes[0]);
+                let p2 = self.read_param(modes[1]);
+
+                let cond = if opcode == 7 {
+                    self.info("LT");
+                    p1 < p2
+                } else {
+                    self.info("EQ");
+                    p1 == p2
+                };
+
+                if cond {
+                    self.write_param(1);
+                } else {
+                    self.write_param(0);
+                }
+            },
+            99 => {
+                self.info("HLT");
+                return State::Halted;
+            },
+            __ => {
+                self.error("invalid opcode");
+                return State::Halted;
+            }
+        }
+
+        return State::Running;
+    }
+
+    pub fn inputs(&self) -> Vec<&i32> {
+        self.inputs.iter().collect()
+    }
+
+    pub fn push_input(&mut self, int: i32) {
+        self.inputs.push_back(int);
     }
 
     /// The outputs of a program.
@@ -200,21 +234,26 @@ impl IntcodeVM {
     }
 }
 
+pub fn parse_program<S: Into<String>>(program: S) -> Vec<i32> {
+    program.into().trim().split(',')
+        .map(|s| s.parse::<i32>().unwrap()).collect()
+}
+
 #[test]
 fn day02_examples() {
     let mut vm = IntcodeVM::new("1,0,0,0,99").log_level(2);
     vm.run();
     assert_eq!([2,0,0,0,99], vm.memory[..5]);
 
-    vm.set_input("2,3,0,3,99");
+    vm.set_program("2,3,0,3,99");
     vm.run();
     assert_eq!([2,3,0,6,99], vm.memory[..5]);
 
-    vm.set_input("2,4,4,5,99,0");
+    vm.set_program("2,4,4,5,99,0");
     vm.run();
     assert_eq!([2,4,4,5,99,9801], vm.memory[..6]);
 
-    vm.set_input("1,1,1,4,99,5,6,0,99");
+    vm.set_program("1,1,1,4,99,5,6,0,99");
     vm.run();
     assert_eq!([30,1,1,4,2,5,6,0,99], vm.memory[..9]);
 }

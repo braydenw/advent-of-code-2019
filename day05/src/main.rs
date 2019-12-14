@@ -12,7 +12,8 @@ fn main() {
 
 /// Seems to average ~0.73ms.
 fn part_one(input: String) {
-    let mut vm = IntcodeVM::new(input).log_level(1);
+    let mut vm = IntcodeVM::new().log_level(1);
+    vm.set_program(input);
     vm.run();
 
     println!("[Part 1] Final output: {}", vm.outputs().last().unwrap());
@@ -20,20 +21,20 @@ fn part_one(input: String) {
 
 /// Seems to average ~0.21ms.
 fn part_two(input: String) {
-    let mut vm = IntcodeVM::new(input).log_level(1);
+    let mut vm = IntcodeVM::new().log_level(1);
+    vm.set_program(input);
     vm.run();
 
     println!("[Part 2] Final output: {}", vm.outputs().last().unwrap());
 }
 
-/// To be run from workspace root with 
-/// `cat test_inputs.txt | cargo test -p day05`.
-/// Also, this is a bad way to do tests. They should really be split
+/// This is a bad way to do tests. They should really be split
 /// into many smaller tests if this were for anything serious.
 #[test]
 fn part_two_examples() {
     // Less than and equal tests
-    let mut vm = IntcodeVM::new("3,9,8,9,10,9,4,9,99,-1,8");
+    let mut vm = IntcodeVM::new();
+    vm.set_program("3,9,8,9,10,9,4,9,99,-1,8");
     vm.push_input(8);
     vm.run();
     assert_eq!(1, vm.outputs()[0]);

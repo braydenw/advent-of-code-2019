@@ -4,11 +4,12 @@ use std::collections::VecDeque;
 
 /// This is just an arbitrary size that seems to be able to hold any
 /// program Advent of Code gives.
-const MEMORY_SIZE: usize = 2048;
+const MEMORY_SIZE: usize = 8192;
 
 pub enum State {
     Halted,
     Running,
+    NeedsInput,
 }
 
 /// The Intcode virtual machine itself.  
@@ -26,17 +27,14 @@ pub struct IntcodeVM {
 impl IntcodeVM {
 
     /// Create a new Intcode virtual machine that will run on `input`.
-    pub fn new<S: Into<String>>(input: S) -> IntcodeVM {
-        let mut me = IntcodeVM {
+    pub fn new() -> IntcodeVM {
+        IntcodeVM {
             memory: [0; MEMORY_SIZE],
             pointer: 0,
             log_level: 0,
             inputs: VecDeque::with_capacity(32),
             outputs: Vec::with_capacity(32),
-        };
-        me.set_program(input);
-
-        me
+        }
     }
 
     /// Set the logging level; 0: Nothing, 1: Errors, 2: Everything.
@@ -48,10 +46,10 @@ impl IntcodeVM {
 
     /// Resets the Intcode virtual machine.
     pub fn reset(&mut self) {
+        self.memory = [0; MEMORY_SIZE];
         self.pointer = 0;
         self.inputs.clear();
         self.outputs.clear();
-        self.memory = [0; MEMORY_SIZE];
     }
 
     /// Set the machine memory to the given program.
@@ -67,8 +65,19 @@ impl IntcodeVM {
 
     /// Step through the program until `State::Halted`.
     pub fn run(&mut self) {
-        while let State::Running = self.step() {
-            // ???
+        loop {
+            match self.step() {
+                State::Running => {},
+                State::Halted => break,
+                State::NeedsInput => {
+                    if let Ok(i) = super::read_stdin().parse::<i32>() {
+                        self.inputs.push_back(i);
+                    } else {
+                        self.error("input was not a valid integer");
+                        break;
+                    }
+                }
+            }
         }
     }
 
@@ -77,7 +86,7 @@ impl IntcodeVM {
         let (opcode, modes) = self.read_instr();
 
         match opcode {
-            
+
             // Opcode: add OR mul
             // Params: read read write
             01 | 02 => {
@@ -103,12 +112,8 @@ impl IntcodeVM {
                 if let Some(int) = self.inputs.pop_front() {
                     self.write_param(int);
                 } else {
-                    if let Ok(i) = super::read_stdin().parse::<i32>() {
-                        self.write_param(i);
-                    } else {
-                        self.error("input was not a valid integer");
-                        return State::Halted;
-                    }
+                    self.pointer -= 1;
+                    return State::NeedsInput;
                 }
             },
 
@@ -259,7 +264,8 @@ pub fn parse_program<S: Into<String>>(program: S) -> Vec<i32> {
 
 #[test]
 fn day02_examples() {
-    let mut vm = IntcodeVM::new("1,0,0,0,99").log_level(2);
+    let mut vm = IntcodeVM::new().log_level(2);
+    vm.set_program("1,0,0,0,99");
     vm.run();
     assert_eq!([2,0,0,0,99], vm.memory[..5]);
 
@@ -278,7 +284,8 @@ fn day02_examples() {
 
 #[test]
 fn day05_examples() {
-    let mut vm = IntcodeVM::new("1002,4,3,4,33").log_level(2);
+    let mut vm = IntcodeVM::new().log_level(2);
+    vm.set_program("1002,4,3,4,33");
     vm.run();
     assert_eq!([1002,4,3,4,99], vm.memory[..5]);
 }

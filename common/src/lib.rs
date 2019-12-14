@@ -1,5 +1,5 @@
 mod intcode;
-pub use intcode::IntcodeVM;
+pub use intcode::{IntcodeVM, State as IntcodeState};
 
 pub use std::io::Read;
 pub use std::fs::File;

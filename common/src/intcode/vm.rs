@@ -1,3 +1,6 @@
+//! Uses channels for input, output, and message passing.
+//! Doing so hopefully simplifies future multithreading.
+
 use crossbeam_channel::{unbounded, Sender, Receiver};
 
 const MEMORY_SIZE: usize = 8192;
@@ -9,11 +12,14 @@ pub enum Message {
 
 pub struct IOHandle<T, R>(Sender<T>, Receiver<R>);
 impl<T, R> IOHandle<T, R> {
+
+    /// Send `data` as input.
     pub fn send(&self, data: T) {
         self.0.send(data)
             .expect("unable to send input");
     }
 
+    /// Receive output data, or `None` if there are none in the output queue.
     pub fn recv(&self) -> Option<R> {
         if let Ok(data) = self.1.try_recv() {
             Some(data)
@@ -21,15 +27,28 @@ impl<T, R> IOHandle<T, R> {
             None
         }
     }
+
+    /// Collects all data from the output queue and returns it.
+    pub fn dump(&self) -> Vec<R> {
+        self.1.try_iter().collect()
+    }
+
+    /// Get the number of queued outputs.
+    pub fn count_output(&self) -> usize {
+        self.1.len()
+    }
 }
 
 pub struct Messenger<Message>(Sender<Message>, Receiver<Message>);
 impl<Message> Messenger<Message> {
-    pub fn send(&self, data: Message) {
-        self.0.send(data)
+
+    /// Send a `Message` through the `Messenger`.
+    pub fn send(&self, msg: Message) {
+        self.0.send(msg)
             .expect("unable to send message");
     }
 
+    /// Receive a `Message` from the `Messenger`.
     pub fn recv(&self) -> Option<Message> {
         if let Ok(msg) = self.1.try_recv() {
             Some(msg)
@@ -43,7 +62,7 @@ impl<Message> Messenger<Message> {
 pub struct IntcodeVM {
     memory: [i64; MEMORY_SIZE],
     instr_pointer: usize,
-    relative_base: usize,
+    relative_base: i64,
     input_sender: Sender<i64>,
     input_recver: Receiver<i64>,
     output_sender: Sender<i64>,
@@ -128,7 +147,7 @@ impl IntcodeVM {
         }
     }
 
-    /// Step through the program until `State::Halted`.
+    /// Step through the program until a `Message::HaltTerminate` is received.
     pub fn run(&mut self) {
         loop {
             if let Ok(msg) = self.message_recver.try_recv() {
@@ -161,31 +180,35 @@ impl IntcodeVM {
 
                 let val = if opcode == 1 {
                     let v = p1 + p2;
-                    self.info(|| instr_encode("ADD", [Some(p1), Some(p2), Some(v)], modes));
+                    self.info(self.instr_pointer - 4,
+                        || instr_encode("ADD", [Some(p1), Some(p2), Some(v)], modes));
 
                     v
                 } else {
                     let v = p1 * p2;
-                    self.info(|| instr_encode("MUL", [Some(p1), Some(p2), Some(v)], modes));
+                    self.info(self.instr_pointer - 4,
+                        || instr_encode("MUL", [Some(p1), Some(p2), Some(v)], modes));
                     
                     v
                 };
 
-                self.write_param(val);
+                self.write_param(val, modes[2]);
             },
             
             // Opcode: input
             // Params: write
             03 => {
-                if let Some(f) = self.input_fn {
-                    let val = (f)();
-                    self.info(|| instr_encode("NPT", [Some(val), None, None], modes));
-                    
-                    self.write_param(val);
-                } else if let Ok(int) = self.input_recver.try_recv() {
-                    self.info(|| instr_encode("NPT", [Some(int), None, None], modes));
+                if let Ok(int) = self.input_recver.try_recv() {
+                    self.info(self.instr_pointer - 2,
+                        || instr_encode("NPT", [Some(int), None, None], modes));
 
-                    self.write_param(int);
+                    self.write_param(int, modes[0]);
+                } else if let Some(f) = self.input_fn {
+                    let val = (f)();
+                    self.info(self.instr_pointer - 2,
+                        || instr_encode("NPT", [Some(val), None, None], modes));
+                    
+                    self.write_param(val, modes[0]);
                 } else {
                     self.message_sender.send(Message::HaltNeedInput)
                         .expect("unable to send wait message");
@@ -199,7 +222,8 @@ impl IntcodeVM {
             // Params: read
             04 => {
                 let val = self.read_param(modes[0]);
-                self.info(|| instr_encode("OPT", [Some(val), None, None], modes));
+                self.info(self.instr_pointer - 2,
+                    || instr_encode("OPT", [Some(val), None, None], modes));
 
                 if let Some(f) = self.output_fn {
                     (f)(val);
@@ -216,10 +240,14 @@ impl IntcodeVM {
                 let p2 = self.read_param(modes[1]);
 
                 let cond = if opcode == 5 {
-                    self.info(|| instr_encode("JT", [Some(p1), Some(p2), None], modes));
+                    self.info(self.instr_pointer - 3,
+                        || instr_encode("JT", [Some(p1), Some(p2), None], modes));
+
                     p1 != 0
                 } else {
-                    self.info(|| instr_encode("JF", [Some(p1), Some(p2), None], modes));
+                    self.info(self.instr_pointer - 3,
+                        || instr_encode("JF", [Some(p1), Some(p2), None], modes));
+
                     p1 == 0
                 };
 
@@ -236,27 +264,42 @@ impl IntcodeVM {
 
                 let cond = if opcode == 7 {
                     let val = p1 < p2;
-                    self.info(|| instr_encode("LT", [Some(p1), Some(p2), Some(val as i64)], modes));
+                    self.info(self.instr_pointer - 4,
+                        || instr_encode("LT", [Some(p1), Some(p2), Some(val as i64)], modes));
 
                     val
                 } else {
                     let val = p1 == p2;
-                    self.info(|| instr_encode("EQ", [Some(p1), Some(p2), Some(val as i64)], modes));
+                    self.info(self.instr_pointer - 4,
+                        || instr_encode("EQ", [Some(p1), Some(p2), Some(val as i64)], modes));
 
                     val
                 };
 
                 if cond {
-                    self.write_param(1);
+                    self.write_param(1, modes[2]);
                 } else {
-                    self.write_param(0);
+                    self.write_param(0, modes[2]);
                 }
             },
+
+            // Opcode: set relative base
+            // Params: read
+            9 => {
+                let p1 = self.read_param(modes[0]);
+
+                self.info(self.instr_pointer - 2,
+                    || instr_encode("REL", [Some(p1), None, None], modes));
+
+                self.relative_base += p1;
+            }
             
             // Opcode: halt
             // Params: none
             99 => {
-                self.info(|| format!("HLT"));
+                self.info(self.instr_pointer - 1,
+                    || format!("HLT"));
+
                 self.message_sender.send(Message::HaltTerminate)
                     .expect("unable to send message");
             },
@@ -264,7 +307,9 @@ impl IntcodeVM {
             // Opcode: unknown
             // Params: perhaps many
             __ => {
-                self.error(|| format!("unknown opcode: {}", opcode));
+                self.error(self.instr_pointer - 1,
+                    || format!("unknown opcode: {}", opcode));
+
                 self.message_sender.send(Message::HaltTerminate)
                     .expect("unable to send message");
             }
@@ -307,35 +352,50 @@ impl IntcodeVM {
         self.instr_pointer += 1;
 
         match mode {
+            // Position
             0 => self.memory[param as usize],
+
+            // Immediate
             1 => param,
+
+            // Relative
+            2 => self.memory[(self.relative_base + param) as usize],
+
+            // Invalid, return garbage.
             _ => std::i64::MAX,
         }
     }
 
     /// Write a value to memory.
-    /// The position in memory is determined by the value currently
-    /// under the instruction pointer.
-    fn write_param(&mut self, value: i64) {
+    fn write_param(&mut self, value: i64, mode: u8) {
         let param = self.memory[self.instr_pointer];
         self.instr_pointer += 1;
         
-        self.memory[param as usize] = value;
+        match mode {
+            // Position
+            0 => self.memory[param as usize] = value,
+
+            // Relative
+            2 => self.memory[(self.relative_base + param) as usize] = value,
+
+            // Invalid, do nothing.
+            _ => {},
+        }
     }
 
     /// Prints an informative message, including the current instruction
     /// pointer and the value to which it points in memory.
-    fn info<F: FnOnce() -> String>(&self, f: F) {
+    fn info<F: FnOnce() -> String>(&self, offset: usize, f: F) {
         if self.log_level >= 2 {
-            println!("[{:>4}] {}", self.instr_pointer - 1, f());
+            println!("[{:>4}] {}", offset, f());
         }
     }
 
     /// Prints an error message, including the current instruction
     /// pointer and the value to which it points in memory.
-    fn error<F: FnOnce() -> String>(&self, f: F) {
+    fn error<F: FnOnce() -> String>(&self, offset: usize, f: F) {
         if self.log_level >= 1 {
-            eprintln!("[{:>4}] #### {}", self.instr_pointer - 1, f());
+            eprintln!("[{:>4}] #### {}", offset, f());
         }
     }
 }

@@ -1,5 +1,5 @@
 mod intcode;
-pub use intcode::{IntcodeVM, State as IntcodeState};
+pub use intcode::{IntcodeVM, Message as IntcodeMessage, default_input};
 
 pub use std::io::Read;
 pub use std::fs::File;
@@ -20,7 +20,7 @@ pub fn get_input(p: &'static str) -> String {
 }
 
 /// Runs a specified part, or both.
-pub fn part_selector(input: String, a: fn(String), b: fn(String)) {
+pub fn part_selector(input: &String, a: fn(&String), b: fn(&String)) {
     let args: Vec<String> = std::env::args().collect();
 
     let start = Instant::now();
@@ -29,7 +29,7 @@ pub fn part_selector(input: String, a: fn(String), b: fn(String)) {
     } else if args.len() == 2 && args[1].as_str() == "2" {
         b(input);
     } else {
-        a(input.clone());
+        a(input);
         b(input);
     }
 

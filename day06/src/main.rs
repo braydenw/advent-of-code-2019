@@ -14,17 +14,17 @@ struct Object {
 fn main() {
     let input = get_input(env!("CARGO_MANIFEST_DIR"));
 
-    part_selector(input, part_one, part_two);
+    part_selector(&input, part_one, part_two);
 }
 
-fn part_one(input: String) {
+fn part_one(input: &String) {
     let orbits = parse_orbits(input);
     let total = total_orbits(&orbits);
 
     println!("[Part 1] Total number of direct and indirect orbits: {}", total);
 }
 
-fn part_two(input: String) {
+fn part_two(input: &String) {
     let orbits = parse_orbits(input);
     let total = min_transfers(&orbits);
 
@@ -32,8 +32,8 @@ fn part_two(input: String) {
 }
 
 /// Converts an object string into a `usize`.
-fn parse_id<S: Into<String>>(s: S) -> usize {
-    let bytes: Vec<u8> = s.into().bytes().collect();
+fn parse_id(s: &str) -> usize {
+    let bytes: Vec<u8> = s.bytes().collect();
     let mut id = 0;
     for i in 0..bytes.len() {
         id |= (bytes[i] as usize) << (i * 8)
@@ -43,7 +43,7 @@ fn parse_id<S: Into<String>>(s: S) -> usize {
 }
 
 /// Parses all the orbits into an easier to traverse format.
-fn parse_orbits(input: String) -> Objects {
+fn parse_orbits(input: &String) -> Objects {
     let mut universe = HashMap::with_capacity(2048);
 
     for line in input.lines() {
@@ -160,11 +160,11 @@ fn id_to_str_tests() {
 #[test]
 fn part_one_examples() {
     let input = "COM)B\nB)C\nC)D\nD)E\nE)F\nB)G\nG)H\nD)I\nE)J\nJ)K\nK)L";
-    assert_eq!(42, total_orbits(&parse_orbits(input.to_string())));
+    assert_eq!(42, total_orbits(&parse_orbits(&input.to_string())));
 }
 
 #[test]
 fn part_two_examples() {
     let input = "COM)B\nB)C\nC)D\nD)E\nE)F\nB)G\nG)H\nD)I\nE)J\nJ)K\nK)L\nK)YOU\nI)SAN";
-    assert_eq!(4, min_transfers(&parse_orbits(input.to_string())));
+    assert_eq!(4, min_transfers(&parse_orbits(&input.to_string())));
 }

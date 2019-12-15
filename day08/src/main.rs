@@ -4,10 +4,10 @@ use common::*;
 fn main() {
     let input = get_input(env!("CARGO_MANIFEST_DIR"));
 
-    part_selector(input, part_one, part_two);
+    part_selector(&input, part_one, part_two);
 }
 
-fn part_one(input: String) {
+fn part_one(input: &String) {
     let layers = create_layers(&input, 25, 6);
 
     // Uses iterators, but filters and counts each layer twice.
@@ -23,7 +23,7 @@ fn part_one(input: String) {
     println!("[Part 1] Number of 1 digits * number of 2 digits: {:?}", ones * twos);
 }
 
-fn part_two(input: String) {
+fn part_two(input: &String) {
     let (w, h) = (25, 6);
     let layers = create_layers(&input, w, h);
     let image = flatten_layers(&layers, w, h);

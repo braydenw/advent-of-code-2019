@@ -7,10 +7,10 @@ use common::*;
 fn main() {
     let input = get_input(env!("CARGO_MANIFEST_DIR"));
 
-    part_selector(input, part_one, part_two);
+    part_selector(&input, part_one, part_two);
 }
 
-fn part_one(input: String) {
+fn part_one(input: &String) {
     let mut sum = 0;
     for line in input.lines() {
         let mass = line.parse::<i32>().unwrap();
@@ -21,7 +21,7 @@ fn part_one(input: String) {
     println!("[Part 1] Sum of fuel requirements: {}", sum);
 }
 
-fn part_two(input: String) {
+fn part_two(input: &String) {
     let mut sum = 0;
     for line in input.lines() {
         let mass = line.parse::<i32>().unwrap();

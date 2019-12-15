@@ -7,10 +7,10 @@ type Line = (Point, Point);
 fn main() {
     let input = get_input(env!("CARGO_MANIFEST_DIR"));
 
-    part_selector(input, part_one, part_two);
+    part_selector(&input, part_one, part_two);
 }
 
-fn part_one(input: String) {
+fn part_one(input: &String) {
     let wires = input.lines()
         .filter(|l| l.len() > 0)
         .collect::<Vec<&str>>();
@@ -24,7 +24,7 @@ fn part_one(input: String) {
     println!("[Part 1] Distance from origin to closest intersection: {}", closest);
 }
 
-fn part_two(input: String) {
+fn part_two(input: &String) {
     let wires = input.lines()
         .filter(|l| l.len() > 0)
         .collect::<Vec<&str>>();

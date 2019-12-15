@@ -6,16 +6,16 @@ use common::*;
 
 /// Setup
 fn main() {
-    part_selector(String::new(), part_one, part_two);
+    part_selector(&String::new(), part_one, part_two);
 }
 
-fn part_one(_: String) {
+fn part_one(_: &String) {
     let valid = count_valid(246515, 739105, None);
 
     println!("[Part 1] Number of possible passwords within the given range: {}", valid);
 }
 
-fn part_two(_: String) {
+fn part_two(_: &String) {
     let valid = count_valid(246515, 739105, Some(2));
 
     println!("[Part 2] Number of possible passwords within the given range: {}", valid);

@@ -10,7 +10,7 @@ pub enum Message {
     HaltNeedInput,
 }
 
-pub struct IOHandle<T, R>(Sender<T>, Receiver<R>);
+pub struct IOHandle<T, R>(Sender<T>, pub Receiver<R>);
 impl<T, R> IOHandle<T, R> {
 
     /// Send `data` as input.
@@ -22,6 +22,15 @@ impl<T, R> IOHandle<T, R> {
     /// Receive output data, or `None` if there are none in the output queue.
     pub fn recv(&self) -> Option<R> {
         if let Ok(data) = self.1.try_recv() {
+            Some(data)
+        } else {
+            None
+        }
+    }
+
+    /// Blocks the thread waiting for output data.
+    pub fn wait_recv(&self) -> Option<R> {
+        if let Ok(data) = self.1.recv() {
             Some(data)
         } else {
             None
@@ -156,18 +165,25 @@ impl IntcodeVM {
                         break;
                     },
                     Message::HaltNeedInput => {
-                        // std::thread::sleep(std::time::Duration::from_millis(1));
+                        // std::thread::sleep(std::time::Duration::from_millis(100));
                         continue;
                     },
                 }
             }
 
-            self.step();
+            if let Some(Message::HaltTerminate) = self.step() {
+                break;
+            }
         }
     }
 
     /// Process a single instruction.
-    pub fn step(&mut self) {
+    /// Returns a `Message` as well as sending it to the
+    /// virtual machine's `Messenger`.
+    /// The returned `Message` can be used for careful synchronous
+    /// stepping while the `Messenger` is recommended for asynchronous
+    /// stepping.
+    pub fn step(&mut self) -> Option<Message> {
         let (opcode, modes) = self.read_instr();
 
         match opcode {
@@ -199,13 +215,13 @@ impl IntcodeVM {
             // Params: write
             03 => {
                 if let Ok(int) = self.input_recver.try_recv() {
-                    self.info(self.instr_pointer - 2,
+                    self.info(self.instr_pointer - 1,
                         || instr_encode("NPT", [Some(int), None, None], modes));
 
                     self.write_param(int, modes[0]);
                 } else if let Some(f) = self.input_fn {
                     let val = (f)();
-                    self.info(self.instr_pointer - 2,
+                    self.info(self.instr_pointer - 1,
                         || instr_encode("NPT", [Some(val), None, None], modes));
                     
                     self.write_param(val, modes[0]);
@@ -215,6 +231,8 @@ impl IntcodeVM {
 
                     // Rewind the instr_pointer
                     self.instr_pointer -= 1;
+
+                    return Some(Message::HaltNeedInput);
                 }
             },
 
@@ -302,6 +320,8 @@ impl IntcodeVM {
 
                 self.message_sender.send(Message::HaltTerminate)
                     .expect("unable to send message");
+
+                return Some(Message::HaltTerminate);
             },
             
             // Opcode: unknown
@@ -314,6 +334,8 @@ impl IntcodeVM {
                     .expect("unable to send message");
             }
         }
+
+        None
     }
 
     /// Get a handle to the machines IO.

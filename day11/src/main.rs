@@ -21,8 +21,8 @@ fn part_two(input: &String) {
 
     // These were found with `panels.keys().min_by_key(..)`
     // and `panels.keys().max_by_key(..)`.
-    let (min_x, min_y) = (0, -5);
-    let (max_x, max_y) = (42, 0);
+    let (min_y, max_y) = (-5, 0);
+    let (min_x, max_x) = (0, 42);
 
     println!("[Part 2]");
 

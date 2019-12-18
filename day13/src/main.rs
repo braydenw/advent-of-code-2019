@@ -18,7 +18,6 @@ fn part_one(input: &String) {
     let game_io = vm.io();
     let game_messenger = vm.messenger();
     let game_system = thread::spawn(move || vm.run());
-    // let mut tiles = [0; 4096]; // width * y + x
     let mut tiles: HashMap<(i64, i64), i64> = HashMap::new();
     while let None = game_messenger.recv() {
         if let Some(x) = game_io.wait_recv() {
@@ -41,36 +40,50 @@ fn part_two(input: &String) {
     
     let game_io = vm.io();
     let game_messenger = vm.messenger();
-    let game_system = thread::spawn(move || {
-        loop {
-            match vm.step() {
-                Some(IntcodeMessage::HaltTerminate) => {
-                    std::thread::sleep(std::time::Duration::from_millis(500));
-                    break;
-                },
-                Some(IntcodeMessage::HaltNeedInput) => continue,
-                None => {},//std::thread::sleep(std::time::Duration::from_micros(500)),
-            }
-        }
-        // vm.run()
-    });
-    let mut tiles = [0; 3600]; // width * y + x
-    // let mut tiles: HashMap<(i64, i64), i64> = HashMap::new();
+    let game_thread = thread::spawn(move || vm.run());
+    let (width, height) = (44, 19);
+    let mut tiles = [0; 881];
     let mut ball_x: i64 = 0;
     let mut paddle_x: i64 = 0;
     let mut score: i64 = 0;
-    'game: loop {
-        if let Some(IntcodeMessage::HaltTerminate) = game_messenger.recv() {
-            break 'game;
+    let mut game_running = true;
+    while game_running {
+        // Quite processing if the game has stopped running;
+        // Send the paddle movement direction if input is needed.
+        match game_messenger.recv() {
+            Some(IntcodeMessage::HaltTerminate) => game_running = false,
+            Some(IntcodeMessage::HaltNeedInput) => game_io.send((ball_x - paddle_x).signum()),
+            None => {}
         }
+        
+        // Print the game.
+        let mut print_buffer = "\n".repeat(30);
+        for y in 0..height {
+            print_buffer.push_str("\n");
+            for x in 0..width {
+                match tiles[(width * y + x) as usize] {
+                    0 => print_buffer.push_str(" "),
+                    1 => print_buffer.push_str("#"),
+                    2 => print_buffer.push_str("="),
+                    3 => print_buffer.push_str("_"),
+                    4 => print_buffer.push_str("o"),
+                    _ => break,
+                }
+            }
+        }
+        print_buffer.push_str(format!("\n{:^45}", score).as_str());
+        print_buffer.push_str(format!("\n{:^45}\n", "Score").as_str());
+        
+        print!("{}\r", print_buffer);
 
+        // Update game information.
         while game_io.count_output() >= 3 {
             if let Some(x) = game_io.recv() {
                 if let Some(y) = game_io.recv() {
                     if let Some(tile) = game_io.recv() {
                         match (x, y) {
                             (-1, 0) => score = tile,
-                            _______ => tiles[(45 * y + x) as usize] = tile,
+                            _______ => tiles[(width * y + x) as usize] = tile,
                         }
 
                         if tile == 3 {
@@ -81,40 +94,8 @@ fn part_two(input: &String) {
                     }
                 }
             }
-
         }
-        let movement = (ball_x - paddle_x).signum();
-        game_io.send(movement);
-
-        let mut print_buffer = String::new();
-        for y in 0..20 {
-            print_buffer.push_str("\n");
-            for x in 0..45 {
-                match tiles[45 * y + x] {
-                    0 => print_buffer.push_str(" "),
-                    1 => print_buffer.push_str("#"),
-                    2 => print_buffer.push_str("="),
-                    3 => print_buffer.push_str("_"),
-                    4 => print_buffer.push_str("o"),
-                    _ => break,
-                }
-            }
-        }
-        print_buffer.push_str(format!("\n{:^45}\n", score).as_str());
-        
-        print!("{}\r", print_buffer);
     }
 
-    let _ = game_system.join();
-    println!("[Part 2] Score: {:?}", score);
-}
-
-#[test]
-fn part_one_examples() {
-    // TODO
-}
-
-#[test]
-fn part_two_examples() {
-    // TODO
+    let _ = game_thread.join();
 }
